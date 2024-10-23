@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Barcode Checker</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+</head>
+<body>
+    <h1>Barcode Product Checker</h1>
+    
+    <!-- رفع ملف Excel -->
+    <input type="file" id="file-input" />
+
+    <!-- المسح بالكاميرا -->
+    <div id="scanner-container"></div>
+
+    <!-- رسالة النتيجة -->
+    <h2 id="result-message"></h2>
+
+    <script>
+        let productData = []; // بيانات المنتجات من ملف Excel
+
+        // قراءة ملف Excel
+        document.getElementById('file-input').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                productData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+
+        // تهيئة Quagga لقراءة الباركود
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#scanner-container'),
+            },
+            decoder: {
+                readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "upc_reader"]
+            }
+        }, function (err) {
+            if (err) {
+                console.log(err);
+                return;
+            }
+            console.log("Ready to start scanning.");
+            Quagga.start();
+        });
+
+        // عندما يتم اكتشاف الباركود
+        Quagga.onDetected(function (result) {
+            const scannedBarcode = result.codeResult.code;
+            const isProductFound = productData.some(row => row.includes(scannedBarcode));
+
+            if (isProductFound) {
+                document.getElementById('result-message').innerText = `المنتج موجود: ${scannedBarcode}`;
+            } else {
+                document.getElementById('result-message').innerText = `المنتج غير موجود: ${scannedBarcode}`;
+            }
+        });
+    </script>
+</body>
+</html>
